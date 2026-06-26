@@ -15,11 +15,49 @@ output:
 library(tidyverse)
 library(plotly) # For interactive visualization
 library(viridis) # For colorblind-safe color palettes
+library(here) # For consistent file paths
 ```
 
 ## Data Exploration
 
-```{r}
+```{r data-exploration}
 # Reading in the data
-usbirths <- read_csv()
+usbirths <- read_csv(here("data", "us_births_00_14.csv"))
+
+glimpse(usbirths)
+
+# Checking for missing values
+sum(is.na(usbirths))
+
+# Summary stats
+summary(usbirths)
 ```
+This dataset contains 6 columns with a total of 5,479 observations. There are no missing values. The minimum number of births in a single day is 5728, the maximum is 16081, and the median is 12343. Given that the data is tidy, no cleaning procedures are necessary. 
+
+## Summarize the Data
+
+In order to prepare for the visualizations, three new dataframes are required for analysis of births by day of the week, days in December, and meteorological season. 
+```{r data-summary}
+# Avg births by day of week
+dayweekbirths <- usbirths %>%
+  group_by(day_of_week) %>%
+  summarize(avg_births = mean(births, na.rm = TRUE))
+
+# Avg births by day in December
+daydecbirths <- usbirths %>%
+  filter(month == 12) %>%
+  group_by(date_of_month) %>%
+  summarize(avg_births = mean(births, na.rm = TRUE))
+
+# Total births per meteorological season
+seasonbirths <- usbirths %>%
+  mutate(
+    season = case_when(
+      month %in% c(3,4,5) ~ "Spring",
+      month %in% c(6,7,8) ~ "Summer",
+      month %in% c(9,10,11) ~ "Fall",
+      month %in% c(12,1,2) ~ "Winter"
+    )
+  )
+```
+
