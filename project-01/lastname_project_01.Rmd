@@ -41,13 +41,33 @@ In order to prepare for the visualizations, three new dataframes are required fo
 # Avg births by day of week
 dayweekbirths <- usbirths %>%
   group_by(day_of_week) %>%
-  summarize(avg_births = mean(births, na.rm = TRUE))
+  summarize(avg_births = mean(births, na.rm = TRUE)) %>%
+  mutate(day_type = ifelse(day_of_week %in% c("Sat", "Sun"), "Weekend", "Weekday"))
 
-# Avg births by day in December
-daydecbirths <- usbirths %>%
-  filter(month == 12) %>%
-  group_by(date_of_month) %>%
-  summarize(avg_births = mean(births, na.rm = TRUE))
+# Avg births by day in Dec 1 - Jan 5 with holidays highlighted
+winterholbirths <- usbirths %>%
+  filter(month == 12 | (month == 1 & date_of_month <= 5)) %>%
+  group_by(month, date_of_month) %>%
+  summarize(avg_births = mean(births, na.rm = TRUE), .groups = 'drop') %>%
+  mutate(
+    avg_births = round(avg_births, 0),
+    period_diff = round(avg_births - winter_mean, 0),
+    date_label = paste(ifelse(month == 12, "Dec", "Jan"), date_of_month),
+    is_holiday = ifelse(
+      (month == 12 & date_of_month %in% c(24,25,31)) | (month == 1 & date_of_month == 1), "Holiday", "Regular Day"
+    ),
+    holiday_name = case_when(
+      month == 12 & date_of_month == 24 ~ "Christmas Eve",
+      month == 12 & date_of_month == 25 ~ "Christmas Day",
+      month == 12 & date_of_month == 31 ~ "New Year's Eve",
+      month == 1  & date_of_month == 1  ~ "New Year's Day",
+      TRUE ~ "Regular Day"
+    )
+  )
+
+# Fixing order of Dec to Jan
+order_levels <- c(paste("Dec", 1:31), paste("Jan", 1:5))
+winterholbirths$date_label <- factor(winterholbirths$date_label, levels = order_levels)
 
 # Total births per meteorological season
 seasonbirths <- usbirths %>%
@@ -58,6 +78,96 @@ seasonbirths <- usbirths %>%
       month %in% c(9,10,11) ~ "Fall",
       month %in% c(12,1,2) ~ "Winter"
     )
+  )
+```
+
+## Visualizations
+
+### Visualization 1: Births by Day of the Week
+```{r visualization-1, fig.alt="Bar chart showing Tuesday has the highest average births and Sunday has the lowest, with weekends colored differently than weekdays using a viridis palette."}
+
+ggplot(dayweekbirths, aes(x = factor(day_of_week, levels = c("Mon", "Tues", "Wed", "Thurs", "Fri", "Sat", "Sun")), y = avg_births, fill = day_type)) +
+  geom_col() +
+  geom_text(aes(label = round(avg_births, 0)), vjust = -0.5, size = 3.5) +
+  scale_fill_viridis_d(begin = 0.3, end = 0.8) +
+  labs(
+    title = "Average Births for Each Day of the Week",
+    subtitle = "Significant drop in average births during the weekend",
+    x = "Day of the Week",
+    y = "Average Births",
+    fill = "Day Type"
+  ) +
+  theme_classic() +
+  expand_limits(y = 14000)
+
+```
+### Visualization 2: December Births (Interactive)
+```{r dec-births, fig.width=10, fig.height=6, fig.alt="Interactive bar chart showing a dip in birth rates around Christmas Eve and Christmas Day in December."}
+
+winter_mean <- mean(winterholbirths$avg_births)
+
+winter_plot <- ggplot(winterholbirths, aes(x = date_label, y = avg_births, fill = is_holiday, text = paste0(holiday_name, "<br>Births: ", avg_births, "<br>+/-: ", period_diff))) +
+  geom_col() +
+  geom_hline(yintercept = winter_mean, linetype = "dashed", color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Holiday" = "#35608d", "Regular Day" = "grey80")) +
+  labs(
+    title = "Effect of Holidays on Daily Births",
+    x = "Date",
+    y = "Average Births",
+    fill = "Day Type"
+  ) +
+  annotate("text", x = 4, y = 10700, label = "Period Average", size = 2.5, textface = "bold")+
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7))
+
+ggplotly(winter_plot, tooltip = "text")
+```
+By utilizing plotly for interactivity, the reader can deeply explore the distinct drops in birth rates between December 1st and January 5th. Hovering over the specific holiday "valleys" reveals not only the exact date and number of births, but also a calculated field showing exactly how far that day deviates from the period average (e.g., Christmas Day showing a drop of 4,605 births). This allows the base chart to maintain a clean, highly accessible two-color design, while still providing the reader with rich, complex summary statistics on demand without cluttering the visual space.
+
+### Visualization 3: Chart Redesign
+
+#### Original Chart
+The original version of this chart removed necessary axis labels and used manual colors that are not colorblind friendly. It is also a very simple visualization that may hide underlying information. 
+
+```{r season-births-1, fig.alt="Original box plot of births by season, using non-accessible colors and missing labels."}
+ggplot(seasonbirths, aes(x = factor(season, levels = c("Spring", "Summer", "Fall", "Winter")), y = births, fill = season)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("Spring" = "darkolivegreen1", 
+                               "Summer" = "gold1", 
+                               "Fall" = "darkorange", 
+                               "Winter" = "cadetblue1")) +
+  labs(
+    title = "Daily U.S. Births By Season",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+#### Redesigned Chart
+In this redesigned version, I restored the axis labels for clarity. To increase the complexity and better communicate the story of the data, I upgraded the chart to a Violin plot overlaid with a Boxplot. This shows the density and distribution of births much better. Finally, to meet **Accessibility** standards, I applied the `scale_fill_viridis_d()` colorblind-safe palette, and added descriptive `fig.alt` text to the code chunk.
+
+```{r vis-3-after, fig.alt="A redesigned violin and box plot showing summer has the highest density of high-birth days, using a colorblind safe viridis palette."}
+ggplot(seasonbirths, aes(x = factor(season, levels = c("Spring", "Summer", "Fall", "Winter")), y = births, fill = season)) +
+  geom_violin(alpha = 0.5, trim = FALSE) + 
+  geom_boxplot(width = 0.2, color = "black", alpha = 0.8, outlier.shape = NA) +
+  scale_fill_viridis_d() + 
+  labs(
+    title = "Distribution of Daily U.S. Births By Season",
+    x = "Season",
+    y = "Daily Births"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+```{r}
+seasonbirths %>%
+  group_by(season) %>%
+  summarize(
+    absolute_range = max(births) - min(births),
+    middle_50_spread = IQR(births)
   )
 ```
 
