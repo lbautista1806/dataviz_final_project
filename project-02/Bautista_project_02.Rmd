@@ -1,5 +1,6 @@
 ---
 title: "Mini-Project 02"
+author: "Lauren Bautista"
 output: 
   html_document:
     keep_md: true
@@ -9,4 +10,181 @@ output:
 
 # Data Visualization Project 02
 
-_revised version of mini-project 02 goes here_
+```{r setup, include=FALSE}
+library(tidyverse)
+library(sf)
+library(plotly)
+library(tigris)
+library(broom)
+library(here)
+library(viridis)
+library(patchwork)
+```
+
+```{r read-data, include=FALSE}
+# Reading in the data
+summerhits <- read_csv(here("data", "all_billboard_summer_hits.csv")) # Vis 1
+
+floridalakes <- st_read(here("data/Florida_Lakes", "Florida_Lakes.shp")) # Vis 2
+
+housewrox <- read_csv(here("data", "WestRoxbury.csv")) # Vis 3
+```
+
+## Data Exploration
+
+### Summer Hits
+```{r data-exploration-1}
+glimpse(summerhits)
+
+# Checking for missing values
+sum(is.na(summerhits))
+
+# Summary
+summary(summerhits)
+```
+The "all_billboard_summer_hits.csv" dataset has 600 rows and 22 columns with zero NA values. The data is tidy, and thus does not need cleaning prior to summarizing. 
+
+### Houses West Roxbury
+```{r data-exploration-3}
+glimpse(housewrox)
+
+# Checking for missing values
+sum(is.na(housewrox)) 
+
+# Summary
+summary(housewrox)
+```
+The "WestRoxbury.csv" dataset has 5802 rows and 14 columns with zero NA values. The data is tidy, and thus does not need cleaning prior to summarizing. 
+
+## Summarize the Data
+
+### Summer Hits
+```{r summarize-summerhits}
+# Creating decade variable
+summerhits <- summerhits %>%
+  mutate(decade = (floor(year/10)*10))
+
+# Grouping by decade and finding total songs, average valence, and average energy
+summertrends <- summerhits %>%
+  group_by(decade) %>%
+  summarize(
+    total_songs = n(),
+    avg_valence = mean(valence, na.rm = TRUE),
+    avg_energy = mean(energy, na.rm = TRUE)
+  )
+
+summertrends
+```
+### Houses West Roxbury
+```{r summarize-housewrox}
+# Removing houses with no build year
+housewrox <- housewrox %>%
+  filter(`YR BUILT` != 0)
+
+# Grouping by bedrooms to find total number of houses, average total value, average living area, and average lot sqft
+housingmodelsummary <- housewrox %>%
+  group_by(BEDROOMS) %>%
+  summarize(
+    total_houses = n(),
+    avg_total_value = mean(`TOTAL VALUE`, na.rm = TRUE),
+    avg_living_area = mean(`LIVING AREA`, na.rm = TRUE),
+    avg_lot_sqft = mean(`LOT SQFT`, na.rm = TRUE)
+  )
+
+housingmodelsummary
+
+# Creating BATHROOMS variable to combine full and half baths, changing unit of living area and lot sqft to 100 ft
+unithousewrox <- housewrox %>%
+  mutate(
+    BATHROOMS = `FULL BATH` + 0.5*`HALF BATH`,
+    living_area_100 = `LIVING AREA`/100,
+    lot_sqft_100 = `LOT SQFT`/100
+  )
+```
+## Visualizations
+
+### Interactive Plot
+```{r}
+cb_palette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7") # Color-blind friendly categorical palette
+
+intplot <- plot_ly(summerhits, x = ~valence, y = ~energy, 
+                   size = ~tempo, sizes = c(5,25),
+                   color = ~as.factor(decade),
+                   colors = cb_palette,
+                   text = ~paste("Song:", track_name, "<br>Artist:", artist_name, "<br>Year:", year),
+          hoverinfo = "text",
+          type = 'scatter', mode = 'markers',
+          marker = list(opacity = 0.6, sizemode = 'diameter')) %>%
+    layout(title = "Mood vs. Energy in Summer Hits Across Decades",
+           xaxis = list(title = "Valence (Happiness)"),
+           yaxis = list(title = "Energy"))
+intplot
+
+htmlwidgets::saveWidget(intplot,"interactive_plot.html")
+```
+### Spatial Visualization
+```{r include=FALSE}
+usstates <- states(cb = TRUE, class = "sf")
+```
+
+```{r}
+flboundary <- usstates[usstates$NAME == "Florida", ]
+
+ggplot() +
+  geom_sf(data = flboundary,
+          fill = "grey80",
+          color = "grey70",
+          size = 0.4) +
+  geom_sf(data = floridalakes,
+          fill = "#0072B2",
+          color = "#0072B2",
+          size = 0.2) +
+  annotate("text", x = -80.9, y = 26.9, label = "Lake Ocheechobee", size = 3.5, fontface = "italic", color = "#2C3E50") +
+  annotate("text", x = -81.8, y = 28.0, label = "High Density:\nCentral FL", 
+           size = 3, color = "#2C3E50") +
+  annotate("text", x = -86.8, y = 30.4, label = "Low Density:\nPanhandle", 
+           size = 3, color = "#2C3E50") +
+  labs(
+    title = "Spatial Visualization of Florida Lakes",
+    subtitle = "Distribution of surface water across the state",
+    caption = "Data from Florida Lakes Dataset"
+  ) +
+  theme_void()
+```
+```{r}
+ggplot() +
+  # 1. Plot the base Florida map and Lakes just like before
+  geom_sf(data = flboundary, fill = "grey95", color = "grey80", size = 0.4) +
+  geom_sf(data = floridalakes, fill = "#56B4E9", color = NA) +
+  
+  # 2. THE ZOOM LENS: Restrict the coordinates to the Lake Okeechobee area
+  coord_sf(
+    xlim = c(-81.6, -80.2), # Longitude boundaries (West to East)
+    ylim = c(26.4, 27.4),   # Latitude boundaries (South to North)
+    expand = FALSE          # Removes extra white space around the edges
+  ) +
+  
+  # 3. Add an annotation right in the center of the lake
+  annotate(
+    "text", x = -80.9, y = 26.9, 
+    label = "Lake Okeechobee", 
+    size = 4, fontface = "italic", color = "#2C3E50"
+  ) +
+  
+  # 4. Update the labels to reflect the new regional focus
+  labs(
+    title = "Surface Water Focus: Lake Okeechobee Basin",
+    subtitle = "Highlighting Florida's largest freshwater lake and surrounding watersheds",
+    caption = "Data: Florida Lakes Dataset"
+  ) +
+  
+  theme_void() +
+  
+  # 5. Add a crisp black border to frame the "zoomed" view
+  theme(
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    plot.title = element_text(margin = margin(b = 5)),
+    plot.subtitle = element_text(margin = margin(b = 15))
+  )
+```
+
