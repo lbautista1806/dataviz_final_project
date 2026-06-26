@@ -32,11 +32,13 @@ sum(is.na(usbirths))
 # Summary stats
 summary(usbirths)
 ```
-This dataset contains 6 columns with a total of 5,479 observations. There are no missing values. The minimum number of births in a single day is 5728, the maximum is 16081, and the median is 12343. Given that the data is tidy, no cleaning procedures are necessary. 
+
+This dataset contains 6 columns with a total of 5,479 observations. There are no missing values. The minimum number of births in a single day is 5728, the maximum is 16081, and the median is 12343. Given that the data is tidy, no cleaning procedures are necessary.
 
 ## Summarize the Data
 
-In order to prepare for the visualizations, three new dataframes are required for analysis of births by day of the week, days in December, and meteorological season. 
+In order to prepare for the visualizations, three new dataframes are required for analysis of births by day of the week, days in December, and meteorological season.
+
 ```{r data-summary}
 # Avg births by day of week
 dayweekbirths <- usbirths %>%
@@ -49,8 +51,12 @@ winterholbirths <- usbirths %>%
   filter(month == 12 | (month == 1 & date_of_month <= 5)) %>%
   group_by(month, date_of_month) %>%
   summarize(avg_births = mean(births, na.rm = TRUE), .groups = 'drop') %>%
+  mutate(avg_births = round(avg_births, 0))
+
+winter_mean <- mean(winterholbirths$avg_births)
+
+winterholbirths <- winterholbirths %>%
   mutate(
-    avg_births = round(avg_births, 0),
     period_diff = round(avg_births - winter_mean, 0),
     date_label = paste(ifelse(month == 12, "Dec", "Jan"), date_of_month),
     is_holiday = ifelse(
@@ -84,6 +90,7 @@ seasonbirths <- usbirths %>%
 ## Visualizations
 
 ### Visualization 1: Births by Day of the Week
+
 ```{r visualization-1, fig.alt="Bar chart showing Tuesday has the highest average births and Sunday has the lowest, with weekends colored differently than weekdays using a viridis palette."}
 
 ggplot(dayweekbirths, aes(x = factor(day_of_week, levels = c("Mon", "Tues", "Wed", "Thurs", "Fri", "Sat", "Sun")), y = avg_births, fill = day_type)) +
@@ -101,10 +108,10 @@ ggplot(dayweekbirths, aes(x = factor(day_of_week, levels = c("Mon", "Tues", "Wed
   expand_limits(y = 14000)
 
 ```
-### Visualization 2: December Births (Interactive)
-```{r dec-births, fig.width=10, fig.height=6, fig.alt="Interactive bar chart showing a dip in birth rates around Christmas Eve and Christmas Day in December."}
 
-winter_mean <- mean(winterholbirths$avg_births)
+### Visualization 2: December Births (Interactive)
+
+```{r dec-births, fig.width=10, fig.height=6, fig.alt="Interactive bar chart showing a dip in birth rates around Christmas Eve and Christmas Day in December."}
 
 winter_plot <- ggplot(winterholbirths, aes(x = date_label, y = avg_births, fill = is_holiday, text = paste0(holiday_name, "<br>Births: ", avg_births, "<br>+/-: ", period_diff))) +
   geom_col() +
@@ -122,12 +129,14 @@ winter_plot <- ggplot(winterholbirths, aes(x = date_label, y = avg_births, fill 
 
 ggplotly(winter_plot, tooltip = "text")
 ```
-By utilizing plotly for interactivity, the reader can deeply explore the distinct drops in birth rates between December 1st and January 5th. Hovering over the specific holiday "valleys" reveals not only the exact date and number of births, but also a calculated field showing exactly how far that day deviates from the period average (e.g., Christmas Day showing a drop of 4,605 births). This allows the base chart to maintain a clean, highly accessible two-color design, while still providing the reader with rich, complex summary statistics on demand without cluttering the visual space.
+
+By utilizing plotly for interactivity, the reader can explore the distinct drops in birth rates between December 1st and January 5th. Hovering over the specific holiday "valleys" reveals number of births, type of day or holiday, and a calculated field showing exactly how far that day deviates from the period average (e.g., Christmas Day showing a drop of 4,605 births). This allows the base chart to maintain a clean, highly accessible two-color design, while still providing the reader with complex summary statistics without additional clutter. This level of detail would be impossible on a static graph as the amount of information would be too overwhelming to parse.
 
 ### Visualization 3: Chart Redesign
 
 #### Original Chart
-The original version of this chart removed necessary axis labels and used manual colors that are not colorblind friendly. It is also a very simple visualization that may hide underlying information. 
+
+In the original version of this chart, I removed necessary axis labels and used manual colors that are not colorblind friendly. It is also a very simple visualization that unintentionally hides underlying information.
 
 ```{r season-births-1, fig.alt="Original box plot of births by season, using non-accessible colors and missing labels."}
 ggplot(seasonbirths, aes(x = factor(season, levels = c("Spring", "Summer", "Fall", "Winter")), y = births, fill = season)) +
@@ -145,7 +154,9 @@ ggplot(seasonbirths, aes(x = factor(season, levels = c("Spring", "Summer", "Fall
   theme(legend.position = "none")
 
 ```
+
 #### Redesigned Chart
+
 In this redesigned version, I restored the axis labels for clarity. To increase the complexity and better communicate the story of the data, I upgraded the chart to a Violin plot overlaid with a Boxplot. This shows the density and distribution of births much better. Finally, to meet **Accessibility** standards, I applied the `scale_fill_viridis_d()` colorblind-safe palette, and added descriptive `fig.alt` text to the code chunk.
 
 ```{r vis-3-after, fig.alt="A redesigned violin and box plot showing summer has the highest density of high-birth days, using a colorblind safe viridis palette."}
@@ -162,12 +173,19 @@ ggplot(seasonbirths, aes(x = factor(season, levels = c("Spring", "Summer", "Fall
   theme(legend.position = "none")
 
 ```
-```{r}
-seasonbirths %>%
-  group_by(season) %>%
-  summarize(
-    absolute_range = max(births) - min(births),
-    middle_50_spread = IQR(births)
-  )
-```
 
+Compared to the plain boxplots, this visualization is significantly more descriptive. In the original graph, there was no indication that the data is had a bimodal distribution, resulting from the daily birth disparities between weekdays and weekends. This sort of data benefits significantly from this multilayered plot so that you can see how the frequency informs the distribution. From the original graph, there is no way to know that there are large dead zones in the distribution. Wildly different datasets can produce the same boxplots, so the extra level of analysis is important.
+
+## Discussion
+
+### Visualization 1
+
+First, I began with looking at the average number of births for each day of the week to figure out which days had the least and most. I created a bar graph for this visualization with the day of the week as the x-axis and the average number of births as the y-axis. To add complexity to this chart, I mapped a colorblind-safe Viridis fill to differentiate weekdays from weekends, and added text annotations above each bar to display the exact summary statistics. This visualization effectively shows the variation in average births based on the day of the week, particularly between weekdays and weekends. The day of the week with the highest number of births is Tuesday with approximately 12,846 births, while the least is Sunday with 7,518. The weekdays are generally pretty consistent with their birth rates, while the weekends drop considerably. This could be due to scheduled births such as inductions and C-sections which are often scheduled during the week.
+
+### Visualization 2
+
+This visualization tracks the daily average births from December 1st through January 5th, explicitly highlighting the impact of major winter holidays. During this 36-day period, the average number of daily births holds steady at approximately 11,000 (represented by the dashed line). However, in the highlighted holiday bars, birth totals plummet significantly below the period average. For instance, Christmas Day routinely experiences the lowest volume of the season, dropping 4,605 births below the baseline. This drop reflects the logistics of modern maternity care and its reliance on scheduled procedures, such as elective C-sections and planned inductions. Similarly to the last example, hospitals and expecting parents actively avoid scheduling these procedures on major holidays due to reduced staffing levels and personal holiday plans. This time, I extended the analysis through the first week of January, highlighting the post-holiday rebound effect. Immediately following the holidays, regular days see a spike above the period average as delayed procedures are finally performed.
+
+### Visualization 3
+
+In the final visualization, I compared the birth rates by season to analyze the summer baby boom. I created four violin and box plots, one for each season, showing the distribution of birth rates. In the plots, you can see that summer has the highest median number of births with fall close behind. Conversely, spring and winter have very similar but lower medians. Interestingly, while summer has the highest median, winter has the largest range. This phenomenon has been linked to increased time indoors in the fall and winter months leading to more conceptions along with increased male fertility in colder months. I color-coded each plot using a colorblind-safe Viridis palette and restored the X and Y axis labels to increase the visual appeal, clarity, and accessibility of the plot.
