@@ -128,6 +128,9 @@ winter_plot <- ggplot(winterholbirths, aes(x = date_label, y = avg_births, fill 
   theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7))
 
 ggplotly(winter_plot, tooltip = "text")
+
+# Save the static ggplot to figures folder
+ggsave(here("figures", "holiday_births_plot.png"), plot = winter_plot, width = 10, height = 6, dpi = 300)
 ```
 
 By utilizing plotly for interactivity, the reader can explore the distinct drops in birth rates between December 1st and January 5th. Hovering over the specific holiday "valleys" reveals number of births, type of day or holiday, and a calculated field showing exactly how far that day deviates from the period average (e.g., Christmas Day showing a drop of 4,605 births). This allows the base chart to maintain a clean, highly accessible two-color design, while still providing the reader with complex summary statistics without additional clutter. This level of detail would be impossible on a static graph as the amount of information would be too overwhelming to parse.

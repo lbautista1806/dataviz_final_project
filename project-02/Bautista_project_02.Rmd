@@ -161,7 +161,7 @@ houseresults
 houseresultsnoint <- houseresults %>%
   filter(term != "(Intercept)")
 
-ggplot(houseresultsnoint, aes(x = estimate, y = term, color = term)) + # 1. Map color to the variable
+ggplot(houseresultsnoint, aes(x = estimate, y = term, color = term)) + # Map color to the variable
   geom_pointrange(aes(xmin = conf.low, xmax = conf.high)) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey", size = 1) +
   
@@ -200,7 +200,9 @@ ggplot(houseresultsnoint, aes(x = estimate, y = term, color = term)) + # 1. Map 
     color = "#2C3E50"
   ) +
   theme_minimal() +
-  theme(legend.position = "none") # 3. Hide the redundant legend
+  theme(legend.position = "none") # Hide the redundant legend
+
+ggsave(here("figures", "housing_coefficient_plot.png"), width = 8, height = 6, dpi = 300)
 ```
 ### Redesign (Bad)
 ```{r fig.alt= "Pie Chart titled House Size by Bedrooms with 9 bedrooms"}

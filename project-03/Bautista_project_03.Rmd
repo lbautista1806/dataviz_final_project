@@ -187,6 +187,9 @@ precip_plot <- ggplot(precip_data, aes(x = date, y = precipitation)) +
   )
 
 ggplotly(precip_plot, tooltip = c("x","y"))
+
+# Save the static ggplot to your figures folder
+ggsave(here("figures", "tpa_precip_lollipop.png"), plot = precip_plot, width = 10, height = 6, dpi = 300)
 ```
 
 This lollipop chart allows you to inspect the individual days that had peaks in precipitation without having to rely on static data labels. This keeps the graph clean while maintaining functionality as the information pops up when you scroll over each lollipop point. This graph effectively showcases Florida's wet summer season and drier fall-spring.
