@@ -104,7 +104,7 @@ unithousewrox <- housewrox %>%
 ## Visualizations
 
 ### Interactive Plot
-```{r}
+```{r fig.alt="Scatter plot titled 'Mood vs. Energy in Summer Hits Across Decades.' It visualizes the relationship between the valence (happiness) and energy levels of popular summer songs spanning from the 1950s to the 2010s."}
 cb_palette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7") # Color-blind friendly categorical palette
 
 intplot <- plot_ly(summerhits, x = ~valence, y = ~energy, 
@@ -127,7 +127,7 @@ htmlwidgets::saveWidget(intplot,"interactive_plot.html")
 usstates <- states(cb = TRUE, class = "sf")
 ```
 
-```{r}
+```{r fig.alt= "Map titled 'Spatial Visualization of Florida Lakes: Distribution of surface water across the state'. The map displays the outline of the state of Florida in light gray, with numerous blue shapes representing the distribution of surface water and lakes throughout the state. The data is sourced from the Florida Lakes Dataset."}
 flboundary <- usstates[usstates$NAME == "Florida", ]
 
 ggplot() +
@@ -139,11 +139,6 @@ ggplot() +
           fill = "#0072B2",
           color = "#0072B2",
           size = 0.2) +
-  annotate("text", x = -80.9, y = 26.9, label = "Lake Ocheechobee", size = 3.5, fontface = "italic", color = "#2C3E50") +
-  annotate("text", x = -81.8, y = 28.0, label = "High Density:\nCentral FL", 
-           size = 3, color = "#2C3E50") +
-  annotate("text", x = -86.8, y = 30.4, label = "Low Density:\nPanhandle", 
-           size = 3, color = "#2C3E50") +
   labs(
     title = "Spatial Visualization of Florida Lakes",
     subtitle = "Distribution of surface water across the state",
@@ -151,40 +146,137 @@ ggplot() +
   ) +
   theme_void()
 ```
+
+### Model Visualization
 ```{r}
-ggplot() +
-  # 1. Plot the base Florida map and Lakes just like before
-  geom_sf(data = flboundary, fill = "grey95", color = "grey80", size = 0.4) +
-  geom_sf(data = floridalakes, fill = "#56B4E9", color = NA) +
+housemodel <- lm(`TOTAL VALUE`~ living_area_100 + lot_sqft_100 + `YR BUILT` + BEDROOMS + BATHROOMS, data = unithousewrox)
+
+housemodel
+```
+```{r}
+houseresults <- tidy(housemodel, conf.int = TRUE)
+houseresults
+```
+```{r fig.alt="A coefficient plot titled 'West Roxbury Housing Value Prediction: Multiple Linear Regression Coefficients w/ 95% Confidence Int.' The chart displays the estimated value impact of various property features on the x-axis, measured in thousands of dollars. The features are listed on the y-axis: '+100 sq. ft. Lot Size', '+100 sq. ft. Living Area', '+1 Bedroom', '+1 Bathroom', and '+1 Year (Newer Construction)'. Each feature has a point indicating the estimated value increase, with horizontal lines representing the 95% confidence intervals. A callout box highlights that 'Adding a bathroom increases value by ~$27.6k'. The data is sourced from the West Roxbury Housing Dataset."}
+houseresultsnoint <- houseresults %>%
+  filter(term != "(Intercept)")
+
+ggplot(houseresultsnoint, aes(x = estimate, y = term, color = term)) + # 1. Map color to the variable
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey", size = 1) +
   
-  # 2. THE ZOOM LENS: Restrict the coordinates to the Lake Okeechobee area
-  coord_sf(
-    xlim = c(-81.6, -80.2), # Longitude boundaries (West to East)
-    ylim = c(26.4, 27.4),   # Latitude boundaries (South to North)
-    expand = FALSE          # Removes extra white space around the edges
+  # Assign the Okabe-Ito colors to model terms
+  scale_color_manual(
+    values = c(
+      "lot_sqft_100" = "#E69F00",    
+      "living_area_100" = "#56B4E9", 
+      "BEDROOMS" = "#009E73",        
+      "BATHROOMS" = "#D55E00",       
+      "`YR BUILT`" = "#CC79A7"      
+    )
   ) +
   
-  # 3. Add an annotation right in the center of the lake
-  annotate(
-    "text", x = -80.9, y = 26.9, 
-    label = "Lake Okeechobee", 
-    size = 4, fontface = "italic", color = "#2C3E50"
-  ) +
-  
-  # 4. Update the labels to reflect the new regional focus
   labs(
-    title = "Surface Water Focus: Lake Okeechobee Basin",
-    subtitle = "Highlighting Florida's largest freshwater lake and surrounding watersheds",
-    caption = "Data: Florida Lakes Dataset"
+    title = "West Roxbury Housing Value Prediction",
+    subtitle = "Multiple Linear Regression Coefficients w/ 95% Confidence Int.",
+    x = "Value Impact per Additional Unit (in $ Thousands)",
+    y = "Property Features",
+    caption = "Data from West Roxbury Housing Dataset"
   ) +
-  
-  theme_void() +
-  
-  # 5. Add a crisp black border to frame the "zoomed" view
-  theme(
-    panel.border = element_rect(colour = "black", fill = NA, size = 1),
-    plot.title = element_text(margin = margin(b = 5)),
-    plot.subtitle = element_text(margin = margin(b = 15))
-  )
+  scale_y_discrete(labels = c(
+    "lot_sqft_100" = "+100 sq. ft. Lot Size",
+    "living_area_100" = "+100 sq. ft. Living Area",
+    "BEDROOMS" = "+1 Bedroom",
+    "BATHROOMS" = "+1 Bathroom",
+    "`YR BUILT`" = "+1 Year (Newer Construction)"
+  )) +
+  annotate(
+    "label", 
+    x = 18, 
+    y = "BATHROOMS", 
+    label = "Adding a bathroom\nincreases value by ~$27.6k",
+    size = 3.5, 
+    fill = "#F8F9F9", 
+    color = "#2C3E50"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") # 3. Hide the redundant legend
+```
+### Redesign (Bad)
+```{r fig.alt= "Pie Chart titled House Size by Bedrooms with 9 bedrooms"}
+# Data Prep for the Pie Chart
+pie_data <- housewrox %>%
+  count(BEDROOMS) %>%
+  mutate(prop = n / sum(n))
+
+# Pie Chart
+ggplot(pie_data, aes(x = "", y = prop, fill = as.factor(BEDROOMS))) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  scale_fill_brewer(palette = "Set3") +
+  labs(
+    title = "House Size by Bedrooms", 
+    fill = "Bedrooms"
+  ) +
+  theme_void()
+```
+```{r fig.alt= "Bar graph showing the number of houses in West Roxbury per number of rooms"}
+# The Clean Bar Chart Redesign
+ggplot(housewrox, aes(x = BEDROOMS)) +
+  geom_bar(fill = "#2C3E50", color = "white", alpha = 0.9) +
+  geom_text(stat = "count", 
+            aes(label = ..count..), 
+            vjust = -0.5, 
+            size = 3.5, 
+            color = "#2C3E50") +
+  scale_x_continuous(breaks = min(housewrox$BEDROOMS, na.rm=TRUE):max(housewrox$BEDROOMS, na.rm=TRUE)) +
+  labs(
+    title = "Distribution of West Roxbury Homes by Bedroom Count",
+    subtitle = "Three-bedroom homes make up the vast majority of the housing market",
+    x = "Number of Bedrooms",
+    y = "Total Number of Houses"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor.x = element_blank())
 ```
 
+## Discussion
+### Interactive Plot
+For the interactive plot, I wanted to see how energy and valence were related for summer hits across decades. I started by using the data summary to check for any unexpected values. Thankfully this data was tidy, so I did not have to do any cleaning. I wanted to get an idea of the energy and valence trends between decades, so I had to create a decade variable. I then grouped by this variable and summarized the data to find total songs, average valence, and average energy per decade. Decades from 1960-2000 had 100 songs each while 1950 and 2010 have 20 and 80 respectively. Interestingly, the average valence and energy had opposite paths across the decades. Valence started at 0.765 in 1950 and dropped steadily to 0.585 by 2010. Conversely, energy started at 0.487 in 1950 and rose to 0.715 by 2010. The reduced valence trend makes logical sense as the 1950s music was impacted by post-WWII optimism. Later decades saw the introduction of moodier music genres like punk and metal. The increase in energy is also expected as digital production technology became mainstream allowing for louder, more energetic tracks to be produced.
+
+For this visualization, I created an interactive bubble chart plotting valence and energy against each other with the bubbles color-coded (Okabe-Ito palette) by decade and sized by tempo. This shows the shift towards the upward right quadrant in music over time. In the 1950s, there are few observations in the upper portion of the graph. As the decades progress, more and more observations cluster at the top of the chart. Modern summer hits are significantly higher-energy than those of the past. Interestingly, the spread of happiness stays relatively consistent, suggesting that happiness is not a requirement to be a summer hit, but high energy often is.
+
+During the plotting process, I originally dealt with a lot of crowding making it extremely difficult to look at individual points. To deal with this, I reduced the size of the bubbles and increased the transparency. Furthermore, the interactive nature of the chart allows decades to be added or removed, so the crowding issue is reduced. In the future, side-by-side box plots could be used to analyze the energy distributions by decade to reduce the noise of individual dots.
+
+When creating this plot, I used a categorical color palette instead of a gradient to distinguish clearly between the different decades. I also added (Happiness) to the valence label so that the reader would not need to know the definition of valence to understand the graph.
+
+### Spatial Visualization
+This visualization is fairly simple as it shows the bodies of water in the state of Florida. This data did not require any cleaning or preparation. However, I did have to source a secondary shapefile for the state of Florida through the tigris package.
+
+This map shows that the lakes in Florida are not evenly distributed, with the southern portion of the state nearly bare. The western side of the Panhandle is also noticeably sparse. Conversely, the central area of Florida is densely populated with lakes.
+
+My original rendition of this plot was just a collection of lakes without the state of Florida for context. This made it difficult to see the distribution across the state. Because of this, I had to source a secondary shapefile and properly order the plots so that the landmass sat behind the lakes. I also had to map the color and fill to the same color to prevent smaller lakes looking darker than larger lakes. To maintain the same theme and accessibility, I used another color from the Okabe-Ito package.
+
+In future explorations, it could be interesting to color code cities or counties based on the square miles of lake within. It would also be interesting to create an interactive feature that shows the names of the lakes when you hover over them. When creating this visualization, I intentionally used the theme theme_void() to remove latitude and longitude as they are not necessary for this graph and were distracting. I also chose blue for the lake color as it is understood as lakes without having to be labeled.
+
+### Model Visualization
+For this visualization, I wanted to plot the value impact of various property features. For data cleaning and prep, I checked the data using the summary. I then removed observations with a year of 0 as they could not be used for my model. Finally, I grouped the data by number of bedrooms and summarized it to show the total number of houses, average total value, average living area, and average lot sqft per bedroom number. I ended up turning the lot sqft and living area into 100 sq. ft. units to fix the scaling issue of having the regression with 1 sq. ft.
+
+My next step was to perform a multiple linear regression to predict total value based on lot size, living size, number of bedrooms, number of bathrooms, and year built. I created a bathrooms variable that combined the full and half bathroom variables into one that could be used for the regression.
+
+After completing the regression, I used the broom package to tidy the results and removed the y intercept. I then created a coefficient plot with the five property features.
+
+When looking at this plot, you can see the biggest drivers of real estate value in West Roxbury. Surprisingly, bathroom space is the most value-inducing attribute, increasing value by $27k per bathroom. Indoor living space is also highly valued, adding $11.7k for 100 sq. ft. of additional space. Yard space, however, is not nearly as important adding less than $1000 per 100 sq. ft. of space.
+
+Furthermore, there is an interesting relationship between living space and bedrooms. While adding living space is extremely beneficial for value, adding bedrooms does reap the same benefits. This could be because adding a bedroom does not necessarily mean adding more space; it could just result in smaller bedrooms overall. Finally, each year added to the construction date results in a $35 decrease in value. This could be due to historic homes in the area being highly valued over new builds.
+
+When creating the visualizations, I dealt with the scaling issue that I mentioned earlier. Originally, I did not change the units of the lot and living areas, so they were based on a 1 sq. ft. increase. This made their impacts on price look extremely insignificant. To better showcase their effects, I changed their units to 100 sq. ft.
+
+In the future, it would be interesting to explore how additions affect price. For example, would adding an extra bedroom to a 2 bed house be more or less valuable than adding one to a 5 bed house.
+
+When designing my visualization, I added descriptive labeling instead of using variable names. This made it clear that we were looking at the impacts of a unit increase in the variables. Furthermore, I added a vertical line at zero to distinguish between positive and negative coefficients and applied the Okabe-Ito color scheme for consistency.
+
+### Redesign
+For this exercise, I created a highly ineffective pie chart for bedroom count distribution. It suffers from the classic pie chart issues like difficulty comparing angles and areas of the slices, and some of the wedges are invisible because they are so small. The pie chart also uses a random color palette that does not go with the rest of the project and is not colorblind friendly. 
+
+To fix these issues, I redesigned the visualization in the form of a bar graph with bedroom counts on the x axis and number of houses on the y. I also labeled the bars, so it was extremely easy to understand the graph. Finally, I applied a monochromatic fill that matches with the rest of the project. 
