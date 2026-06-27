@@ -22,7 +22,13 @@ The following is a portfolio of products created during the *"Data Visualization
 
 In the `project_01/` folder you can find an exploratory data analysis of daily U.S. births from 2000 to 2014 using the following libraries: tidyverse, plotly, viridis, and here. This project investigates temporal birth trends, specifically analyzing how birth rates fluctuate by day of the week, dip significantly during major winter holidays, and vary across meteorological seasons. The analysis reveals how modern maternity care logistics—such as scheduled inductions and C-sections—create distinct bi-modal distributions and predictable drops in weekend and holiday birth volumes.
 
-**Core Requirements Met:** \* **Interactivity:** The HTML report features a `plotly` bar chart of winter births. Hovering over the holiday "valleys" reveals the exact numerical deviation from the period average, allowing the reader to explore specific dates without cluttering the static chart. \* **Accessibility:** Applied colorblind-safe `viridis` palettes to distinguish weekdays from weekends, and included descriptive `fig.alt` text for screen readers. \* **Redesign:** Transformed a poor-quality, manually colored boxplot missing axis labels into an accessible, multilayered violin and boxplot that properly reveals the data's bimodal distribution.
+**Core Requirements Met:**
+
+- **Interactivity:** The HTML report features a `plotly` bar chart of winter births. Hovering over the holiday "valleys" reveals the exact numerical deviation from the period average, allowing the reader to explore specific dates without cluttering the static chart.
+
+- **Accessibility:** Applied colorblind-safe `viridis` palettes to distinguish weekdays from weekends, and included descriptive `fig.alt` text for screen readers.
+
+- **Redesign:** Transformed a poor-quality, manually colored boxplot missing axis labels into an accessible, multilayered violin and boxplot that properly reveals the data's bimodal distribution.
 
 **Sample data visualization:**
 
